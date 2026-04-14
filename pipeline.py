@@ -341,10 +341,11 @@ Rules:
     profile = CompanyProfileDraft(**data["profile"])
     news = NewsDraft(**data["news"])
 
+    fields = CompanyProfileDraft.model_fields
     console.print(
         f"  Profile fields populated: "
-        f"[green]{sum(1 for f in profile.model_fields if getattr(profile, f).value is not None)}[/green]"
-        f"/{len(profile.model_fields)}"
+        f"[green]{sum(1 for f in fields if getattr(profile, f).value is not None)}[/green]"
+        f"/{len(fields)}"
     )
     console.print(f"  News items: [green]{len(news.items)}[/green]")
     return profile, news
