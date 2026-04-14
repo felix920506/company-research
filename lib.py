@@ -69,13 +69,18 @@ def content_hash(text: str) -> str:
 
 
 def ai_call(system: str, user: str) -> dict:
-    """Call the AI with JSON mode and return the parsed response."""
+    """Call the AI with a single system+user exchange and return the parsed response."""
+    return ai_call_messages([
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ])
+
+
+def ai_call_messages(messages: list[dict]) -> dict:
+    """Call the AI with a full message history and return the parsed response."""
     response = ai.chat.completions.create(
         model=OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
+        messages=messages,
         response_format={"type": "json_object"},
         temperature=0.1,
     )
