@@ -6,29 +6,25 @@ Usage:
 
 Environment variables (see .env.example):
     OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL,
-    MAX_LOOP_ITERATIONS, SEARCH_PROVIDER
+    MAX_AGENT_STEPS, SEARCH_PROVIDER
 """
 from __future__ import annotations
 
 import argparse
 import asyncio
 import sys
-from typing import List, Optional
 
-from lib import MAX_LOOP_ITERATIONS, OPENAI_API_KEY, console, save_json
-from models import CompanyProfileDraft, NewsDraft
+from rich.panel import Panel
+
+from lib import OPENAI_API_KEY, console, save_json
 from search import SearchProvider, get_provider
 from stages import (
     human_gate_identity,
     human_gate_output,
+    run_research_agent,
     stage1_identity,
-    stage2_discover,
-    stage3_fetch,
-    stage4_extract,
-    stage5_feedback,
     stage6_output,
 )
-from rich.panel import Panel
 
 
 async def run_pipeline(company_input: str, searcher: SearchProvider) -> None:
@@ -39,45 +35,16 @@ async def run_pipeline(company_input: str, searcher: SearchProvider) -> None:
         style="blue",
     ))
 
-    # Stage 1 — identity (human-gated)
+    # Stage 1 — identity resolution (human-gated)
     identity, history = stage1_identity(company_input, searcher)
     identity, outdir = human_gate_identity(company_input, identity, history, searcher)
 
-    profile: Optional[CompanyProfileDraft] = None
-    news: Optional[NewsDraft] = None
-    seen_urls: set[str] = set()
-    extra_queries: List[str] = []
+    # Stages 2–5 — agentic research loop
+    profile, news = await run_research_agent(identity, searcher, outdir)
+    save_json(outdir / "profile_draft.json", profile)
+    save_json(outdir / "news_draft.json", news)
 
-    # Stages 2-5 — autonomous research loop
-    for iteration in range(MAX_LOOP_ITERATIONS):
-        console.print(f"\n[bold]Research loop — pass {iteration + 1} of {MAX_LOOP_ITERATIONS}[/bold]")
-
-        sources = stage2_discover(identity, extra_queries, seen_urls, searcher)
-        save_json(outdir / "sources.json", sources)
-
-        if not sources:
-            console.print("[yellow]No new sources found — stopping loop early.[/yellow]")
-            break
-
-        fetched = await stage3_fetch(sources, outdir)
-        profile, news = stage4_extract(identity, fetched, profile, news)
-
-        save_json(outdir / "profile_draft.json", profile)
-        save_json(outdir / "news_draft.json", news)
-
-        feedback = stage5_feedback(profile, news, iteration)
-
-        if not feedback.has_gaps:
-            break
-
-        if iteration < MAX_LOOP_ITERATIONS - 1:
-            extra_queries = feedback.follow_up_queries
-        else:
-            console.print(f"[yellow]Reached max iterations ({MAX_LOOP_ITERATIONS}) — proceeding to output.[/yellow]")
-
-    # Stage 6 — final output (human-gated)
-    profile = profile or CompanyProfileDraft()
-    news = news or NewsDraft()
+    # Stage 6 — report generation (human-gated)
     report_md = stage6_output(identity, profile, news, outdir)
     human_gate_output(report_md, identity, profile, news, outdir)
 
