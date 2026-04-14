@@ -5,11 +5,13 @@ import hashlib
 import json
 import os
 import re
+import time
 from pathlib import Path
 from string import Template
+from typing import Any, Callable
 
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import APIError, OpenAI
 from rich.console import Console
 
 load_dotenv()
@@ -67,6 +69,19 @@ def content_hash(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()[:16]
 
 
+def api_call_with_retry(fn: Callable[[], Any], retries: int = 3, delay: float = 3.0) -> Any:
+    """Call fn(), retrying on transient API errors up to `retries` times."""
+    for attempt in range(retries + 1):
+        try:
+            return fn()
+        except APIError as e:
+            if attempt == retries:
+                raise
+            console.print(f"  [yellow]API error (attempt {attempt + 1}/{retries + 1}): {e} — retrying in {delay:.0f}s[/yellow]")
+            time.sleep(delay)
+            delay *= 2  # exponential backoff
+
+
 def ai_call(system: str, user: str) -> dict:
     """Call the AI with a single system+user exchange and return the parsed response."""
     return ai_call_messages([
@@ -77,10 +92,10 @@ def ai_call(system: str, user: str) -> dict:
 
 def ai_call_messages(messages: list[dict]) -> dict:
     """Call the AI with a full message history and return the parsed response."""
-    response = ai.chat.completions.create(
+    response = api_call_with_retry(lambda: ai.chat.completions.create(
         model=OPENAI_MODEL,
         messages=messages,
         response_format={"type": "json_object"},
         temperature=0.1,
-    )
+    ))
     return json.loads(response.choices[0].message.content)

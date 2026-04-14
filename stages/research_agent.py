@@ -18,6 +18,7 @@ from lib import (
     OPENAI_MODEL,
     PROMPTS_DIR,
     ai,
+    api_call_with_retry,
     console,
     content_hash,
     save_json,
@@ -105,12 +106,12 @@ async def run_research_agent(
     src_counter = 0
 
     for step in range(MAX_AGENT_STEPS):
-        response = ai.chat.completions.create(
+        response = api_call_with_retry(lambda: ai.chat.completions.create(
             model=OPENAI_MODEL,
             messages=messages,
             tools=TOOLS,
             tool_choice="required",
-        )
+        ))
         msg = response.choices[0].message
         messages.append(msg)
 
@@ -239,12 +240,12 @@ async def _force_finish(messages: list[dict]) -> tuple[CompanyProfileDraft, News
         "role": "user",
         "content": "You have reached the research step limit. You must call finish() now with whatever you have gathered so far.",
     })
-    response = ai.chat.completions.create(
+    response = api_call_with_retry(lambda: ai.chat.completions.create(
         model=OPENAI_MODEL,
         messages=messages,
         tools=TOOLS,
         tool_choice={"type": "function", "function": {"name": "finish"}},
-    )
+    ))
     args = json.loads(response.choices[0].message.tool_calls[0].function.arguments)
     return _parse_finish(args)
 
