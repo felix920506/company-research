@@ -40,8 +40,8 @@ async def run_pipeline(company_input: str, searcher: SearchProvider) -> None:
     ))
 
     # Stage 1 — identity (human-gated)
-    identity = stage1_identity(company_input)
-    identity, outdir = human_gate_identity(company_input, identity)
+    identity, history = stage1_identity(company_input, searcher)
+    identity, outdir = human_gate_identity(company_input, identity, history, searcher)
 
     profile: Optional[CompanyProfileDraft] = None
     news: Optional[NewsDraft] = None
