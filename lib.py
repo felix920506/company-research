@@ -1,0 +1,82 @@
+"""Shared configuration, client instances, and utility functions."""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+from pathlib import Path
+from string import Template
+
+from dotenv import load_dotenv
+from openai import OpenAI
+from rich.console import Console
+
+load_dotenv()
+
+# ── Config ────────────────────────────────────────────────────────────────────
+
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
+MAX_LOOP_ITERATIONS = int(os.environ.get("MAX_LOOP_ITERATIONS", "3"))
+MAX_SOURCES_PER_ITERATION = 10
+MAX_CONTENT_CHARS = 3000  # per source before sending to AI
+NEWS_WINDOW_DAYS = 90
+
+# ── Shared instances ──────────────────────────────────────────────────────────
+
+console = Console()
+ai = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL)
+PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+
+# ── Prompt loading ────────────────────────────────────────────────────────────
+
+def prompt(name: str, role: str, **kwargs) -> str:
+    """Load a prompt template from prompts/ and substitute $variables."""
+    template = (PROMPTS_DIR / f"{name}.{role}.txt").read_text(encoding="utf-8")
+    return Template(template).substitute(kwargs)
+
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+
+def slugify(text: str) -> str:
+    text = text.lower().strip()
+    text = re.sub(r"[^\w\s-]", "", text)
+    text = re.sub(r"[\s_]+", "-", text)
+    return text[:64]
+
+
+def output_dir(name: str) -> Path:
+    path = Path("output") / slugify(name)
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def save_json(path: Path, data) -> None:
+    if hasattr(data, "model_dump"):
+        content = data.model_dump()
+    elif isinstance(data, list):
+        content = [d.model_dump() if hasattr(d, "model_dump") else d for d in data]
+    else:
+        content = data
+    path.write_text(json.dumps(content, indent=2, default=str))
+
+
+def content_hash(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+
+def ai_call(system: str, user: str) -> dict:
+    """Call the AI with JSON mode and return the parsed response."""
+    response = ai.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0.1,
+    )
+    return json.loads(response.choices[0].message.content)
