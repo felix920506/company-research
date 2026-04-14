@@ -1,5 +1,8 @@
 Resolve this to a company identity: "$company_input"
 
+Search results to help ground your answer:
+$search_results
+
 Return JSON with these exact keys:
 - resolved_name: the most common name used for this company
 - legal_name: official legal entity name (null if unknown)
