@@ -19,6 +19,7 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
+from string import Template
 from typing import List, Optional
 
 from dotenv import load_dotenv
@@ -30,7 +31,6 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
 from models import (
-    CitedField,
     CompanyProfileDraft,
     FetchedContent,
     FeedbackResult,
@@ -54,6 +54,14 @@ MAX_CONTENT_CHARS = 3000  # per source before sending to AI
 NEWS_WINDOW_DAYS = 90
 
 ai = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL)
+
+PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+
+def prompt(name: str, role: str, **kwargs) -> str:
+    """Load a prompt template and substitute $variables."""
+    template = (PROMPTS_DIR / f"{name}.{role}.txt").read_text(encoding="utf-8")
+    return Template(template).substitute(kwargs)
 
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
@@ -104,25 +112,11 @@ def ai_call(system: str, user: str) -> dict:
 def stage1_identity(company_input: str) -> IdentityDraft:
     console.rule("[bold blue]Stage 1: Identity Resolution")
 
-    system = (
-        "You are a company identity resolver. "
-        "Given a company name or description, resolve it to a verified identity. "
-        "Return only valid JSON."
-    )
-    user = f"""Resolve this to a company identity: "{company_input}"
-
-Return JSON with these exact keys:
-- resolved_name: the most common name used for this company
-- legal_name: official legal entity name (null if unknown)
-- aliases: array of other names this company is known by
-- website: official website URL (null if unknown)
-- jurisdiction: country or state of incorporation (null if unknown)
-- entity_type: one of "public", "private", "subsidiary", "nonprofit", "unknown"
-- identifiers: object with known identifiers e.g. {{"ticker": "AAPL"}} (empty if none)
-- ambiguities: array of other companies that could be confused with this one"""
-
     with console.status("Resolving company identity..."):
-        data = ai_call(system, user)
+        data = ai_call(
+            prompt("stage1_identity", "system"),
+            prompt("stage1_identity", "user", company_input=company_input),
+        )
 
     return IdentityDraft(**data)
 
@@ -166,26 +160,18 @@ def stage2_discover(
 ) -> List[Source]:
     console.rule("[bold blue]Stage 2: Source Discovery")
 
-    system = (
-        "You are a research source discovery agent. "
-        "Generate search queries and seed URLs to research a company. "
-        "Return only valid JSON."
-    )
     extra = "\n".join(f"- {q}" for q in extra_queries) if extra_queries else "None"
-    user = f"""Research company: {identity.resolved_name}
-Website: {identity.website or "unknown"}
-Entity type: {identity.entity_type or "unknown"}
-Additional focus areas (from gap analysis):
-{extra}
-
-Return JSON with:
-- seed_urls: array of 3-5 specific URLs to fetch directly
-  (e.g. official site pages, Wikipedia, Crunchbase, LinkedIn company page)
-- search_queries: array of 3-5 search query strings to find news and information
-  from the last {NEWS_WINDOW_DAYS} days"""
 
     with console.status("Generating research sources..."):
-        data = ai_call(system, user)
+        data = ai_call(
+            prompt("stage2_discover", "system"),
+            prompt("stage2_discover", "user",
+                   resolved_name=identity.resolved_name,
+                   website=identity.website or "unknown",
+                   entity_type=identity.entity_type or "unknown",
+                   extra=extra,
+                   news_window_days=NEWS_WINDOW_DAYS),
+        )
 
     sources: List[Source] = []
     src_idx = len(seen_urls) + 1
@@ -287,56 +273,19 @@ def stage4_extract(
         console.print("[yellow]No content to extract from.[/yellow]")
         return existing_profile or CompanyProfileDraft(), existing_news or NewsDraft()
 
-    system = (
-        "You are a company research analyst. "
-        "Extract structured facts and news items from web content. "
-        "Only use information directly stated in the sources. "
-        "Never invent or infer facts not present in the text. "
-        "Return only valid JSON."
-    )
-
     existing_profile_json = existing_profile.model_dump_json(indent=2) if existing_profile else "null"
     existing_news_json = existing_news.model_dump_json(indent=2) if existing_news else "null"
 
-    user = f"""Extract company information for: {identity.resolved_name}
-
-SOURCES:
-{_sources_block(fetched)}
-
-EXISTING PROFILE (null or partial — merge and improve, do not regress):
-{existing_profile_json}
-
-EXISTING NEWS (null or partial — add new items only, no duplicates):
-{existing_news_json}
-
-Return JSON with exactly this shape:
-{{
-  "profile": {{
-    "company_name":      {{"value": "...", "citations": [{{"source_id": "src_001", "canonical_url": "...", "published_at": null, "excerpt": "..."}}]}},
-    "industry":          {{"value": "...", "citations": [...]}},
-    "hq":                {{"value": "...", "citations": [...]}},
-    "founded":           {{"value": "...", "citations": [...]}},
-    "employee_count":    {{"value": "...", "citations": [...]}},
-    "description":       {{"value": "...", "citations": [...]}},
-    "products_services": {{"value": "...", "citations": [...]}},
-    "key_leadership":    {{"value": "...", "citations": [...]}},
-    "financials":        {{"value": "...", "citations": [...]}}
-  }},
-  "news": {{
-    "items": [
-      {{"headline": "...", "date": "YYYY-MM-DD or null", "summary": "...", "topic": "...", "citations": [...]}}
-    ]
-  }}
-}}
-
-Rules:
-- citations must reference source_ids from the SOURCES block above
-- excerpt must be a verbatim quote ≤200 chars
-- set value to null (not omit) when unsupported by sources
-- for news, only include items from the last {NEWS_WINDOW_DAYS} days when date is known"""
-
     with console.status("Extracting facts and news..."):
-        data = ai_call(system, user)
+        data = ai_call(
+            prompt("stage4_extract", "system"),
+            prompt("stage4_extract", "user",
+                   resolved_name=identity.resolved_name,
+                   sources_block=_sources_block(fetched),
+                   existing_profile_json=existing_profile_json,
+                   existing_news_json=existing_news_json,
+                   news_window_days=NEWS_WINDOW_DAYS),
+        )
 
     profile = CompanyProfileDraft(**data["profile"])
     news = NewsDraft(**data["news"])
@@ -360,30 +309,13 @@ def stage5_feedback(
 ) -> FeedbackResult:
     console.rule(f"[bold blue]Stage 5: Gap Analysis  [iteration {iteration + 1}/{MAX_LOOP_ITERATIONS}]")
 
-    system = (
-        "You are a research quality reviewer. "
-        "Evaluate a company profile for completeness and suggest follow-up searches. "
-        "Return only valid JSON."
-    )
-    user = f"""Review this company research for completeness.
-
-PROFILE:
-{profile.model_dump_json(indent=2)}
-
-NEWS ITEMS: {len(news.items)} items found
-
-Return JSON:
-{{
-  "has_gaps": true or false,
-  "missing_fields": ["list of profile field names that are null or empty"],
-  "follow_up_queries": ["up to 3 specific search queries to fill the most important gaps"],
-  "notes": "one-sentence summary of issues, or empty string if none"
-}}
-
-Only set has_gaps=true if important fields (description, hq, or industry) are still null."""
-
     with console.status("Analysing research gaps..."):
-        data = ai_call(system, user)
+        data = ai_call(
+            prompt("stage5_feedback", "system"),
+            prompt("stage5_feedback", "user",
+                   profile_json=profile.model_dump_json(indent=2),
+                   news_item_count=len(news.items)),
+        )
 
     result = FeedbackResult(**data)
 
@@ -407,46 +339,17 @@ def stage6_output(
 ) -> str:
     console.rule("[bold blue]Stage 6: Report Generation")
 
-    system = (
-        "You are a research report writer. "
-        "Generate a clear, factual Markdown report. "
-        "Return JSON: {\"report\": \"<markdown string>\"}."
-    )
     today = datetime.now().strftime("%Y-%m-%d")
 
-    user = f"""Generate a company research report in Markdown.
-
-COMPANY: {identity.resolved_name}
-DATE: {today}
-
-PROFILE:
-{profile.model_dump_json(indent=2)}
-
-NEWS:
-{news.model_dump_json(indent=2)}
-
-Structure:
-# {identity.resolved_name} — Research Report
-*Generated: {today}*
-
-## Overview
-[2-3 sentence summary]
-
-## Key Facts
-[Markdown table — omit rows where value is null]
-
-## Recent News
-[Bulleted list — most recent first]
-
-## Sources
-[Numbered list of all cited URLs]
-
-Inline citation style: [¹](url)
-Mark uncertain facts: *(unverified)*
-Return JSON: {{"report": "..."}}"""
-
     with console.status("Writing report..."):
-        data = ai_call(system, user)
+        data = ai_call(
+            prompt("stage6_output", "system"),
+            prompt("stage6_output", "user",
+                   resolved_name=identity.resolved_name,
+                   today=today,
+                   profile_json=profile.model_dump_json(indent=2),
+                   news_json=news.model_dump_json(indent=2)),
+        )
 
     report_md: str = data["report"]
 
@@ -489,9 +392,8 @@ def human_gate_output(
         refinement = Prompt.ask("What would you like changed?")
         with console.status("Refining report..."):
             data = ai_call(
-                "You are a report editor. Refine the Markdown report per the user's request. "
-                "Return JSON: {\"report\": \"<markdown>\"}.",
-                f"CURRENT REPORT:\n{report_md}\n\nUSER REQUEST: {refinement}",
+                prompt("refine_report", "system"),
+                prompt("refine_report", "user", report_md=report_md, refinement=refinement),
             )
         human_gate_output(data["report"], identity, profile, news, outdir)
 

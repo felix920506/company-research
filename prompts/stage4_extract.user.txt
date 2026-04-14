@@ -1,0 +1,36 @@
+Extract company information for: $resolved_name
+
+SOURCES:
+$sources_block
+
+EXISTING PROFILE (null or partial — merge and improve, do not regress):
+$existing_profile_json
+
+EXISTING NEWS (null or partial — add new items only, no duplicates):
+$existing_news_json
+
+Return JSON with exactly this shape:
+{
+  "profile": {
+    "company_name":      {"value": "...", "citations": [{"source_id": "src_001", "canonical_url": "...", "published_at": null, "excerpt": "..."}]},
+    "industry":          {"value": "...", "citations": [...]},
+    "hq":                {"value": "...", "citations": [...]},
+    "founded":           {"value": "...", "citations": [...]},
+    "employee_count":    {"value": "...", "citations": [...]},
+    "description":       {"value": "...", "citations": [...]},
+    "products_services": {"value": "...", "citations": [...]},
+    "key_leadership":    {"value": "...", "citations": [...]},
+    "financials":        {"value": "...", "citations": [...]}
+  },
+  "news": {
+    "items": [
+      {"headline": "...", "date": "YYYY-MM-DD or null", "summary": "...", "topic": "...", "citations": [...]}
+    ]
+  }
+}
+
+Rules:
+- citations must reference source_ids from the SOURCES block above
+- excerpt must be a verbatim quote ≤200 chars
+- set value to null (not omit) when unsupported by sources
+- for news, only include items from the last $news_window_days days when date is known

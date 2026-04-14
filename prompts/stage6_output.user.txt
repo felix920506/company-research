@@ -1,0 +1,30 @@
+Generate a company research report in Markdown.
+
+COMPANY: $resolved_name
+DATE: $today
+
+PROFILE:
+$profile_json
+
+NEWS:
+$news_json
+
+Structure:
+# $resolved_name — Research Report
+*Generated: $today*
+
+## Overview
+[2-3 sentence summary]
+
+## Key Facts
+[Markdown table — omit rows where value is null]
+
+## Recent News
+[Bulleted list — most recent first]
+
+## Sources
+[Numbered list of all cited URLs]
+
+Inline citation style: [¹](url)
+Mark uncertain facts: *(unverified)*
+Return JSON: {"report": "..."}

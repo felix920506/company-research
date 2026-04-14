@@ -1,0 +1,16 @@
+Review this company research for completeness.
+
+PROFILE:
+$profile_json
+
+NEWS ITEMS: $news_item_count items found
+
+Return JSON:
+{
+  "has_gaps": true or false,
+  "missing_fields": ["list of profile field names that are null or empty"],
+  "follow_up_queries": ["up to 3 specific search queries to fill the most important gaps"],
+  "notes": "one-sentence summary of issues, or empty string if none"
+}
+
+Only set has_gaps=true if important fields (description, hq, or industry) are still null.
