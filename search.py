@@ -28,7 +28,7 @@ class DuckDuckGoProvider(SearchProvider):
     """Free search via duckduckgo-search. No API key needed."""
 
     def search(self, query: str, max_results: int = 5) -> List[SearchResult]:
-        from duckduckgo_search import DDGS
+        from ddgs import DDGS
 
         with DDGS() as ddgs:
             raw = ddgs.text(query, max_results=max_results)
