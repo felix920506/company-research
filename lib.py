@@ -19,9 +19,8 @@ load_dotenv()
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
-MAX_LOOP_ITERATIONS = int(os.environ.get("MAX_LOOP_ITERATIONS", "3"))
-MAX_SOURCES_PER_ITERATION = 10
-MAX_CONTENT_CHARS = 3000  # per source before sending to AI
+MAX_AGENT_STEPS = int(os.environ.get("MAX_AGENT_STEPS", "25"))
+MAX_CONTENT_CHARS = 3000  # per fetched page before adding to agent context
 NEWS_WINDOW_DAYS = 90
 
 # ── Shared instances ──────────────────────────────────────────────────────────
