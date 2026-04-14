@@ -23,13 +23,6 @@ class IdentityDraft(BaseModel):
     ambiguities: List[str] = Field(default_factory=list)
 
 
-class Source(BaseModel):
-    source_id: str
-    url: str
-    query_used: Optional[str] = None
-    category: str  # "official", "news", "reference"
-
-
 class FetchedContent(BaseModel):
     source_id: str
     url: str
@@ -67,13 +60,6 @@ class NewsItem(BaseModel):
 
 class NewsDraft(BaseModel):
     items: List[NewsItem] = Field(default_factory=list)
-
-
-class FeedbackResult(BaseModel):
-    has_gaps: bool
-    missing_fields: List[str] = Field(default_factory=list)
-    follow_up_queries: List[str] = Field(default_factory=list)
-    notes: str = ""
 
 
 class SearchResult(BaseModel):
