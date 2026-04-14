@@ -219,6 +219,24 @@ async def stage3_fetch(sources: List[Source], outdir: Path) -> List[FetchedConte
             console.print(f"  Fetching [dim]{source.url[:80]}[/dim]")
             try:
                 result = await crawler.arun(url=source.url)
+                # Dump raw crawl4ai result in human-readable form
+                sid = source.source_id
+                meta = {
+                    "url": result.url,
+                    "success": result.success,
+                    "error_message": getattr(result, "error_message", None),
+                    "metadata": result.metadata,
+                    "links": result.links,
+                    "media": result.media,
+                }
+                (fetched_dir / f"{sid}.meta.json").write_text(
+                    json.dumps(meta, indent=2, default=str)
+                )
+                if result.markdown:
+                    (fetched_dir / f"{sid}.md").write_text(result.markdown)
+                if result.cleaned_html:
+                    (fetched_dir / f"{sid}.html").write_text(result.cleaned_html)
+
                 if result.success:
                     markdown = result.markdown or ""
                     metadata = result.metadata or {}
