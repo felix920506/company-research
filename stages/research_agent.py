@@ -108,6 +108,8 @@ async def run_research_agent(
 
     seen_urls: set[str] = set()
     src_counter = 0
+    total_prompt_tokens = 0
+    total_cached_tokens = 0
 
     for step in range(MAX_AGENT_STEPS):
         response = api_call_with_retry(lambda: ai.chat.completions.create(
@@ -119,6 +121,22 @@ async def run_research_agent(
         msg = response.choices[0].message
         messages.append(msg)
 
+        usage = response.usage
+        if usage:
+            prompt_tokens = usage.prompt_tokens or 0
+            cached_tokens = (
+                usage.prompt_tokens_details.cached_tokens
+                if usage.prompt_tokens_details
+                else 0
+            ) or 0
+            total_prompt_tokens += prompt_tokens
+            total_cached_tokens += cached_tokens
+            cache_pct = int(cached_tokens / prompt_tokens * 100) if prompt_tokens else 0
+            console.print(
+                f"  [dim]tokens: {prompt_tokens} prompt ({cache_pct}% cached), "
+                f"{usage.completion_tokens} completion[/dim]"
+            )
+
         for tool_call in msg.tool_calls:
             name = tool_call.function.name
             args = json.loads(tool_call.function.arguments)
@@ -126,6 +144,7 @@ async def run_research_agent(
             console.print(f"  [dim]→ {name}[/dim]({_fmt_args(name, args)})  [dim](step {step + 1}/{MAX_AGENT_STEPS})[/dim]")
 
             if name == "finish":
+                _log_cache_summary(total_prompt_tokens, total_cached_tokens)
                 return _parse_finish(args)
 
             if name == "search":
@@ -145,6 +164,7 @@ async def run_research_agent(
             })
 
     console.print(f"[yellow]Reached MAX_AGENT_STEPS ({MAX_AGENT_STEPS}) — forcing finish.[/yellow]")
+    _log_cache_summary(total_prompt_tokens, total_cached_tokens)
     return await _force_finish(messages)
 
 
@@ -299,6 +319,15 @@ def _initial_message(identity: IdentityDraft) -> str:
     return (
         f"Research this company and build a comprehensive profile.\n\n"
         f"Company identity:\n{identity.model_dump_json(indent=2)}"
+    )
+
+
+def _log_cache_summary(total_prompt: int, total_cached: int) -> None:
+    if not total_prompt:
+        return
+    pct = int(total_cached / total_prompt * 100)
+    console.print(
+        f"  [dim]cache summary: {total_cached:,}/{total_prompt:,} prompt tokens cached ({pct}%)[/dim]"
     )
 
 
