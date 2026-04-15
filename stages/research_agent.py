@@ -207,13 +207,17 @@ async def _tool_fetch(
                 logger=crawler_logger,
             )
 
+        timeout_s = CRAWL4AI_PAGE_TIMEOUT / 1000 * 2  # 2× page_timeout as hard wall-clock cap
         async with AsyncWebCrawler(crawler_strategy=strategy) as crawler:
-            result = await crawler.arun(
-                url=url,
-                config=CrawlerRunConfig(
-                    page_timeout=CRAWL4AI_PAGE_TIMEOUT,
-                    verbose=CRAWL4AI_VERBOSE,
+            result = await asyncio.wait_for(
+                crawler.arun(
+                    url=url,
+                    config=CrawlerRunConfig(
+                        page_timeout=CRAWL4AI_PAGE_TIMEOUT,
+                        verbose=CRAWL4AI_VERBOSE,
+                    ),
                 ),
+                timeout=timeout_s,
             )
 
         _dump_raw(result, source_id, fetched_dir)
