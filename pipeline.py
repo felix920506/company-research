@@ -6,7 +6,7 @@ Usage:
 
 Environment variables (see .env.example):
     OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL,
-    MAX_AGENT_STEPS, SEARCH_PROVIDER
+    MAX_PROFILE_STEPS, MAX_NEWS_STEPS, MAX_AGENT_STEPS, SEARCH_PROVIDER
 """
 from __future__ import annotations
 
@@ -21,7 +21,8 @@ from search import SearchProvider, get_provider
 from stages import (
     human_gate_identity,
     human_gate_output,
-    run_research_agent,
+    run_news_agent,
+    run_profile_agent,
     stage1_identity,
     stage6_output,
 )
@@ -39,9 +40,12 @@ async def run_pipeline(company_input: str, searcher: SearchProvider) -> None:
     identity, history = stage1_identity(company_input, searcher)
     identity, outdir = human_gate_identity(company_input, identity, history, searcher)
 
-    # Stages 2–5 — agentic research loop
-    profile, news = await run_research_agent(identity, searcher, outdir)
+    # Stage 2 — profile research
+    profile, seen_urls = await run_profile_agent(identity, searcher, outdir)
     save_json(outdir / "profile_draft.json", profile)
+
+    # Stage 3 — news research (reuses seen_urls to avoid re-fetching)
+    news = await run_news_agent(identity, searcher, outdir, seen_urls)
     save_json(outdir / "news_draft.json", news)
 
     # Stage 6 — report generation (human-gated)
