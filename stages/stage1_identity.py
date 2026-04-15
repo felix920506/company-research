@@ -7,7 +7,9 @@ from typing import List
 from rich.prompt import Confirm, Prompt
 from rich.table import Table
 
-from lib import ai_call_messages, console, output_dir, prompt, save_json
+from lib import OPENAI_MODEL, OPENAI_MODEL_IDENTITY, ai_call_messages, ai_identity, console, output_dir, prompt, save_json
+
+_MODEL = OPENAI_MODEL_IDENTITY or OPENAI_MODEL
 from models import IdentityDraft
 from search import SearchProvider
 
@@ -30,7 +32,7 @@ def stage1_identity(company_input: str, searcher: SearchProvider) -> tuple[Ident
     ]
 
     with console.status("Resolving company identity..."):
-        data = ai_call_messages(history)
+        data = ai_call_messages(history, model=_MODEL, client=ai_identity)
 
     history.append({"role": "assistant", "content": json.dumps(data)})
     return IdentityDraft(**data), history
@@ -79,7 +81,7 @@ def _clarify_identity(
     })
 
     with console.status("Re-resolving company identity..."):
-        data = ai_call_messages(history)
+        data = ai_call_messages(history, model=_MODEL, client=ai_identity)
 
     history.append({"role": "assistant", "content": json.dumps(data)})
     return IdentityDraft(**data), history

@@ -21,6 +21,12 @@ load_dotenv()
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
+
+# Identity stage — separate model/provider only when model is explicitly set.
+# OPENAI_BASE_URL_IDENTITY and OPENAI_API_KEY_IDENTITY are ignored if model is unset.
+OPENAI_MODEL_IDENTITY: str | None = os.environ.get("OPENAI_MODEL_IDENTITY") or None
+OPENAI_BASE_URL_IDENTITY = os.environ.get("OPENAI_BASE_URL_IDENTITY", OPENAI_BASE_URL)
+OPENAI_API_KEY_IDENTITY = os.environ.get("OPENAI_API_KEY_IDENTITY", OPENAI_API_KEY)
 MAX_AGENT_STEPS = int(os.environ.get("MAX_AGENT_STEPS", "25"))
 NEWS_WINDOW_DAYS = int(os.environ.get("NEWS_WINDOW_DAYS", "90"))
 CRAWL4AI_BROWSER_MODE = os.environ.get("CRAWL4AI_BROWSER_MODE", "regular").lower()
@@ -33,6 +39,11 @@ MAX_CONTENT_CHARS = int(_max_content_chars) if _max_content_chars else None  # N
 
 console = Console()
 ai = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL)
+ai_identity = (
+    OpenAI(api_key=OPENAI_API_KEY_IDENTITY, base_url=OPENAI_BASE_URL_IDENTITY)
+    if OPENAI_MODEL_IDENTITY
+    else ai
+)
 PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 
@@ -86,18 +97,19 @@ def api_call_with_retry(fn: Callable[[], Any], retries: int = 3, delay: float = 
             delay *= 2  # exponential backoff
 
 
-def ai_call(system: str, user: str) -> dict:
+def ai_call(system: str, user: str, model: str = OPENAI_MODEL, client: OpenAI = None) -> dict:
     """Call the AI with a single system+user exchange and return the parsed response."""
     return ai_call_messages([
         {"role": "system", "content": system},
         {"role": "user", "content": user},
-    ])
+    ], model=model, client=client)
 
 
-def ai_call_messages(messages: list[dict]) -> dict:
+def ai_call_messages(messages: list[dict], model: str = OPENAI_MODEL, client: OpenAI = None) -> dict:
     """Call the AI with a full message history and return the parsed response."""
-    response = api_call_with_retry(lambda: ai.chat.completions.create(
-        model=OPENAI_MODEL,
+    c = client or ai
+    response = api_call_with_retry(lambda: c.chat.completions.create(
+        model=model,
         messages=messages,
         response_format={"type": "json_object"},
         temperature=0.1,
