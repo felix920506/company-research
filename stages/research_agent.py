@@ -13,6 +13,7 @@ from typing import List
 
 from lib import (
     CRAWL4AI_BROWSER_MODE,
+    CRAWL4AI_PAGE_TIMEOUT,
     MAX_AGENT_STEPS,
     MAX_CONTENT_CHARS,
     NEWS_WINDOW_DAYS,
@@ -176,7 +177,7 @@ async def _tool_fetch(
     fetched_dir.mkdir(exist_ok=True)
 
     try:
-        from crawl4ai import AsyncWebCrawler, BrowserConfig
+        from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
         from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
 
         if CRAWL4AI_BROWSER_MODE == "stealth":
@@ -194,7 +195,10 @@ async def _tool_fetch(
             )
 
         async with AsyncWebCrawler(crawler_strategy=strategy) as crawler:
-            result = await crawler.arun(url=url)
+            result = await crawler.arun(
+                url=url,
+                config=CrawlerRunConfig(page_timeout=CRAWL4AI_PAGE_TIMEOUT),
+            )
 
         _dump_raw(result, source_id, fetched_dir)
 
