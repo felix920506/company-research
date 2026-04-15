@@ -119,7 +119,7 @@ async def run_research_agent(
             name = tool_call.function.name
             args = json.loads(tool_call.function.arguments)
 
-            console.print(f"  [dim]→ {name}[/dim]({_fmt_args(name, args)})")
+            console.print(f"  [dim]→ {name}[/dim]({_fmt_args(name, args)})  [dim](step {step + 1}/{MAX_AGENT_STEPS})[/dim]")
 
             if name == "finish":
                 return _parse_finish(args)
