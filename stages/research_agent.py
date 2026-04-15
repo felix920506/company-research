@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import List
 
 from lib import (
+    CRAWL4AI_BROWSER_MODE,
     MAX_AGENT_STEPS,
     MAX_CONTENT_CHARS,
     NEWS_WINDOW_DAYS,
@@ -175,9 +176,24 @@ async def _tool_fetch(
     fetched_dir.mkdir(exist_ok=True)
 
     try:
-        from crawl4ai import AsyncWebCrawler
+        from crawl4ai import AsyncWebCrawler, BrowserConfig
+        from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
 
-        async with AsyncWebCrawler(verbose=False) as crawler:
+        if CRAWL4AI_BROWSER_MODE == "stealth":
+            strategy = AsyncPlaywrightCrawlerStrategy(
+                browser_config=BrowserConfig(enable_stealth=True, verbose=False)
+            )
+        elif CRAWL4AI_BROWSER_MODE == "undetected":
+            from crawl4ai import UndetectedAdapter
+            strategy = AsyncPlaywrightCrawlerStrategy(
+                browser_adapter=UndetectedAdapter()
+            )
+        else:
+            strategy = AsyncPlaywrightCrawlerStrategy(
+                browser_config=BrowserConfig(verbose=False)
+            )
+
+        async with AsyncWebCrawler(crawler_strategy=strategy) as crawler:
             result = await crawler.arun(url=url)
 
         _dump_raw(result, source_id, fetched_dir)
