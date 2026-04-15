@@ -203,7 +203,9 @@ async def _tool_fetch(
         _dump_raw(result, source_id, fetched_dir)
 
         if not result.success:
-            return f"Fetch failed for {url}"
+            reason = getattr(result, "error_message", None) or "(no error_message)"
+            console.print(f"  [red]✗ fetch failed[/red] {url}\n    reason: {reason}")
+            return f"Fetch failed for {url}: {reason}"
 
         markdown = result.markdown or ""
         metadata = result.metadata or {}
@@ -225,7 +227,8 @@ async def _tool_fetch(
         return f"URL: {fc.canonical_url}\nTitle: {fc.title or '(unknown)'}\nPublished: {fc.published_at or 'unknown'}\n\n{snippet}"
 
     except Exception as e:
-        return f"Fetch error for {url}: {e}"
+        console.print(f"  [red]✗ fetch exception[/red] {url}\n    {type(e).__name__}: {e}")
+        return f"Fetch error for {url}: {type(e).__name__}: {e}"
 
 
 def _dump_raw(result, source_id: str, fetched_dir: Path) -> None:
