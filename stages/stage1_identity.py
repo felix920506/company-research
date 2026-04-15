@@ -56,7 +56,7 @@ _MODEL = OPENAI_MODEL_IDENTITY or OPENAI_MODEL
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
-def stage1_identity(
+async def stage1_identity(
     company_input: str,
     searcher: SearchProvider,
 ) -> tuple[IdentityDraft, list[dict]]:
@@ -65,21 +65,17 @@ def stage1_identity(
     Returns the resolved identity and the full message history so the
     conversation can be continued if the user rejects the result.
     """
-    import asyncio
     console.rule("[bold blue]Stage 1: Identity Resolution")
-    return asyncio.get_event_loop().run_until_complete(
-        _run_identity_agent(company_input, searcher)
-    )
+    return await _run_identity_agent(company_input, searcher)
 
 
-def human_gate_identity(
+async def human_gate_identity(
     company_input: str,
     identity: IdentityDraft,
     history: list[dict],
     searcher: SearchProvider,
 ) -> tuple[IdentityDraft, Path]:
     """Show resolved identity, ask for confirmation, return (identity, outdir)."""
-    import asyncio
     while True:
         _print_identity_table(identity)
 
@@ -87,8 +83,8 @@ def human_gate_identity(
             break
 
         clarification = Prompt.ask("Please clarify (e.g. 'Apple Records, not Apple Inc.')")
-        identity, history = asyncio.get_event_loop().run_until_complete(
-            _run_identity_agent(company_input, searcher, clarification=clarification)
+        identity, history = await _run_identity_agent(
+            company_input, searcher, clarification=clarification
         )
 
     outdir = output_dir(identity.resolved_name)

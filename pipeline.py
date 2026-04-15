@@ -37,8 +37,8 @@ async def run_pipeline(company_input: str, searcher: SearchProvider) -> None:
     ))
 
     # Stage 1 — identity resolution (human-gated)
-    identity, history = stage1_identity(company_input, searcher)
-    identity, outdir = human_gate_identity(company_input, identity, history, searcher)
+    identity, history = await stage1_identity(company_input, searcher)
+    identity, outdir = await human_gate_identity(company_input, identity, history, searcher)
 
     # Stage 2 — profile research
     profile, seen_urls = await run_profile_agent(identity, searcher, outdir)
