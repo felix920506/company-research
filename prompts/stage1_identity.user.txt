@@ -1,14 +1,1 @@
-Resolve this to a company identity: "$company_input"
-
-Search results to help ground your answer:
-$search_results
-
-Return JSON with these exact keys:
-- resolved_name: the most common name used for this company
-- legal_name: official legal entity name (null if unknown)
-- aliases: array of other names this company is known by
-- website: official website URL (null if unknown)
-- jurisdiction: country or state of incorporation (null if unknown)
-- entity_type: one of "public", "private", "subsidiary", "nonprofit", "unknown"
-- identifiers: object with known identifiers e.g. {"ticker": "AAPL"} (empty if none)
-- ambiguities: array of other companies that could be confused with this one
+Resolve the identity of this company: "$company_input"
