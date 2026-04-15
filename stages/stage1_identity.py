@@ -170,16 +170,17 @@ async def _force_finish_identity(messages: list[dict]) -> IdentityDraft:
 
 def _parse_identity(args: dict) -> IdentityDraft:
     try:
-        if not args:
-            console.print("  [red bold]finish() called with empty args — identity agent produced no output[/red bold]")
-            return IdentityDraft(resolved_name="Unknown")
-
         data = args.get("identity", args)
         if data is args and "identity" not in args:
             console.print(
                 f"  [yellow]finish() missing 'identity' key — attempting top-level parse[/yellow]\n"
                 f"  keys present: {list(args.keys())}"
             )
+
+        if not data or not data.get("resolved_name"):
+            console.print("  [red bold]finish() returned empty identity — agent produced no output[/red bold]")
+            return IdentityDraft(resolved_name="Unknown")
+
         return IdentityDraft(**data)
 
     except Exception as e:
