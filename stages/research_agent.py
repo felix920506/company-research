@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import date, timedelta
 from pathlib import Path
 from typing import List
 
@@ -98,8 +99,16 @@ async def run_research_agent(
     """Run the agentic research loop and return structured findings."""
     console.rule("[bold blue]Research Agent  (stages 2–5)")
 
+    today = date.today()
+    news_cutoff = today - timedelta(days=NEWS_WINDOW_DAYS)
+
     system_prompt = (PROMPTS_DIR / "research_agent.system.txt").read_text(encoding="utf-8")
-    system_prompt = system_prompt.replace("$news_window_days", str(NEWS_WINDOW_DAYS))
+    system_prompt = (
+        system_prompt
+        .replace("$current_date", today.strftime("%Y-%m-%d"))
+        .replace("$news_cutoff_date", news_cutoff.strftime("%Y-%m-%d"))
+        .replace("$news_window_days", str(NEWS_WINDOW_DAYS))
+    )
 
     messages: list[dict] = [
         {"role": "system", "content": system_prompt},
