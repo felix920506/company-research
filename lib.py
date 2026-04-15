@@ -24,6 +24,7 @@ OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o")
 MAX_AGENT_STEPS = int(os.environ.get("MAX_AGENT_STEPS", "25"))
 CRAWL4AI_BROWSER_MODE = os.environ.get("CRAWL4AI_BROWSER_MODE", "regular").lower()
 CRAWL4AI_PAGE_TIMEOUT = int(os.environ.get("CRAWL4AI_PAGE_TIMEOUT", "15000"))  # ms
+CRAWL4AI_VERBOSE = os.environ.get("CRAWL4AI_VERBOSE", "0") == "1"
 MAX_CONTENT_CHARS = 3000  # per fetched page before adding to agent context
 NEWS_WINDOW_DAYS = 90
 

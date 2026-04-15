@@ -7,6 +7,7 @@ calls finish() or the MAX_AGENT_STEPS hard cap is reached.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import List
@@ -14,6 +15,7 @@ from typing import List
 from lib import (
     CRAWL4AI_BROWSER_MODE,
     CRAWL4AI_PAGE_TIMEOUT,
+    CRAWL4AI_VERBOSE,
     MAX_AGENT_STEPS,
     MAX_CONTENT_CHARS,
     NEWS_WINDOW_DAYS,
@@ -179,25 +181,39 @@ async def _tool_fetch(
     try:
         from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
         from crawl4ai.async_crawler_strategy import AsyncPlaywrightCrawlerStrategy
+        from crawl4ai.async_logger import AsyncLogger
 
-        if CRAWL4AI_BROWSER_MODE == "stealth":
-            strategy = AsyncPlaywrightCrawlerStrategy(
-                browser_config=BrowserConfig(enable_stealth=True, verbose=False)
-            )
-        elif CRAWL4AI_BROWSER_MODE == "undetected":
+        log_file = str(fetched_dir / f"{source_id}.crawl4ai.log")
+        crawler_logger = AsyncLogger(
+            log_file=log_file,
+            verbose=CRAWL4AI_VERBOSE,
+        )
+
+        browser_config = BrowserConfig(
+            enable_stealth=(CRAWL4AI_BROWSER_MODE == "stealth"),
+            verbose=CRAWL4AI_VERBOSE,
+        )
+
+        if CRAWL4AI_BROWSER_MODE == "undetected":
             from crawl4ai import UndetectedAdapter
             strategy = AsyncPlaywrightCrawlerStrategy(
-                browser_adapter=UndetectedAdapter()
+                browser_config=browser_config,
+                browser_adapter=UndetectedAdapter(),
+                logger=crawler_logger,
             )
         else:
             strategy = AsyncPlaywrightCrawlerStrategy(
-                browser_config=BrowserConfig(verbose=False)
+                browser_config=browser_config,
+                logger=crawler_logger,
             )
 
         async with AsyncWebCrawler(crawler_strategy=strategy) as crawler:
             result = await crawler.arun(
                 url=url,
-                config=CrawlerRunConfig(page_timeout=CRAWL4AI_PAGE_TIMEOUT),
+                config=CrawlerRunConfig(
+                    page_timeout=CRAWL4AI_PAGE_TIMEOUT,
+                    verbose=CRAWL4AI_VERBOSE,
+                ),
             )
 
         _dump_raw(result, source_id, fetched_dir)
