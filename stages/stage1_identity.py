@@ -181,6 +181,10 @@ def _parse_identity(args: dict) -> IdentityDraft:
             console.print("  [red bold]finish() returned empty identity — agent produced no output[/red bold]")
             return IdentityDraft(resolved_name="Unknown")
 
+        # Strip null values from identifiers — model is Dict[str, str]
+        if isinstance(data.get("identifiers"), dict):
+            data["identifiers"] = {k: v for k, v in data["identifiers"].items() if v is not None}
+
         return IdentityDraft(**data)
 
     except Exception as e:
