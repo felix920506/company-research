@@ -270,9 +270,10 @@ async def _tool_fetch(
         )
         save_json(fetched_dir / f"{source_id}.json", fc)
 
-        snippet = markdown[:MAX_CONTENT_CHARS]
-        if len(markdown) > MAX_CONTENT_CHARS:
-            snippet += "\n[...truncated...]"
+        if MAX_CONTENT_CHARS is not None and len(markdown) > MAX_CONTENT_CHARS:
+            snippet = markdown[:MAX_CONTENT_CHARS] + "\n[...truncated...]"
+        else:
+            snippet = markdown
         return f"URL: {fc.canonical_url}\nTitle: {fc.title or '(unknown)'}\nPublished: {fc.published_at or 'unknown'}\n\n{snippet}"
 
     except Exception as e:
@@ -301,9 +302,32 @@ def _dump_raw(result, source_id: str, fetched_dir: Path) -> None:
 # ── Finish handling ───────────────────────────────────────────────────────────
 
 def _parse_finish(args: dict) -> tuple[CompanyProfileDraft, NewsDraft]:
-    profile = CompanyProfileDraft(**args["profile"])
-    news = NewsDraft(**args["news"])
-    return profile, news
+    try:
+        if not args:
+            console.print("  [red bold]finish() called with empty args — LLM produced no research output[/red bold]")
+            return CompanyProfileDraft(), NewsDraft()
+
+        # Expected shape: {"profile": {...}, "news": {...}}
+        if "profile" in args and "news" in args:
+            profile = CompanyProfileDraft(**args["profile"])
+            news = NewsDraft(**args["news"])
+            populated = sum(1 for f in profile.model_fields if getattr(profile, f).value is not None)
+            if populated == 0:
+                console.print("  [red bold]finish() profile has no populated fields — LLM produced no research output[/red bold]")
+            return profile, news
+
+        # Fallback: LLM returned fields at the top level without the wrapper keys
+        console.print(
+            f"  [yellow]finish() args missing 'profile'/'news' keys — attempting top-level parse[/yellow]\n"
+            f"  keys present: {list(args.keys())}"
+        )
+        profile_fields = {k: v for k, v in args.items() if k in CompanyProfileDraft.model_fields}
+        news_fields = {k: v for k, v in args.items() if k in NewsDraft.model_fields}
+        return CompanyProfileDraft(**profile_fields), NewsDraft(**news_fields)
+
+    except Exception as e:
+        console.print(f"  [red]_parse_finish failed: {e}[/red]\n  raw args: {json.dumps(args, indent=2, default=str)[:2000]}")
+        raise
 
 
 async def _force_finish(messages: list[dict]) -> tuple[CompanyProfileDraft, NewsDraft]:

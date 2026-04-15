@@ -26,7 +26,8 @@ NEWS_WINDOW_DAYS = int(os.environ.get("NEWS_WINDOW_DAYS", "90"))
 CRAWL4AI_BROWSER_MODE = os.environ.get("CRAWL4AI_BROWSER_MODE", "regular").lower()
 CRAWL4AI_PAGE_TIMEOUT = int(os.environ.get("CRAWL4AI_PAGE_TIMEOUT", "15000"))  # ms
 CRAWL4AI_VERBOSE = os.environ.get("CRAWL4AI_VERBOSE", "0") == "1"
-MAX_CONTENT_CHARS = 3000  # per fetched page before adding to agent context
+_max_content_chars = os.environ.get("MAX_CONTENT_CHARS", "")
+MAX_CONTENT_CHARS = int(_max_content_chars) if _max_content_chars else None  # None = unlimited
 
 # ── Shared instances ──────────────────────────────────────────────────────────
 
